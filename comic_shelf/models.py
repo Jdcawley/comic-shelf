@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import declarative_base, relationship
 
 # Base class for all ORM models; replaces raw SQL with Python class/object interaction
@@ -42,6 +42,8 @@ class Issue(Base):
     issue_number = Column(Integer, nullable=False)
     title = Column(String)
     release_date = Column(String)
+
+    __table_args__ = (UniqueConstraint('series_id', 'issue_number', name='uq_series_issue'),)
 
     series = relationship('Series', back_populates='issues')
     collections = relationship('Collection', back_populates='issue', cascade='all, delete-orphan')
