@@ -97,5 +97,85 @@ def add_to_collection(issue_number, series, read, condition):
         click.echo(f"Issue #{issue_number} is already in the collection.")
         return
     
+@cli.command()
+def list_publishers():
+    """List all publishers."""
+    session = get_session()
+    publishers = session.query(Publisher).all()
+    if not publishers:
+        click.echo("No publishers found.")
+        return
+    click.echo("Publishers:")
+    click.echo("-----------")
+    for publisher in publishers:
+        click.echo(f"{publisher.name}")
+
+@cli.command()
+def list_series():
+    """List all series."""
+    session = get_session()
+    series_list = session.query(Series).all()
+    if not series_list:
+        click.echo("No series found.")
+        return
+    click.echo("Series:")
+    click.echo("-------")
+    for series in series_list:
+        click.echo(f"{series.name}, Publisher: {series.publisher.name}")
+
+# TODO: Add sorting options (recently added, alphabetical)
+# TODO: Add display format options (grouped by publisher/series, flat list)
+# TODO: Allow user to filter by read/unread, condition
+@cli.command()
+def list_collection():
+    """List all issues in the collection."""
+    session = get_session()
+    collection_entries = session.query(Collection).all()
+    if not collection_entries:
+        click.echo("No issues in the collection.")
+        return
+    click.echo("Collection:")
+    click.echo("-----------")
+    for entry in collection_entries:
+        issue = entry.issue
+        series = issue.series
+        publisher = series.publisher
+        if publisher.name != current_publisher:
+            current_publisher = publisher.name
+            click.echo(f"\n{publisher.name}")
+        if series.name != current_series:
+            current_series = series.name
+            click.echo(f"  {series.name}")
+        title = f" - {issue.title}" if issue.title else ""
+        read = "Yes" if entry.read else "No"
+        condition = entry.condition or "N/A"
+        click.echo(f"    #{issue.issue_number}{title} | Read: {read} | Condition: {condition}")
+
+@cli.command()
+@click.option('--series', prompt='Series name', help='The name of the series to add to the pull list.')
+@click.option('--issue-number', type=int, default=None, help='The issue number to add to the pull list (optional).')
+def add_to_pull_list(series, issue_number):
+    """Add a series to the pull list."""
+    session = get_session()
+    series_record = session.query(Series).filter_by(name=series).first()
+    if not series_record:
+        click.echo(f"Series '{series}' not found.")
+        return
+    # Check first before adding to avoid unnecessary database entries
+    existing_entry = session.query(PullList).filter_by(series_id=series_record.id, issue_number=issue_number, active=True).first()
+    if existing_entry:
+        if issue_number:
+            click.echo(f"Issue '#{issue_number}' of series '{series}' is already in the pull list.")
+        else:
+            click.echo(f"'{series}' is already in the pull list.")
+        return
+    pull_list_entry = PullList(series=series_record, issue_number=issue_number)
+    session.add(pull_list_entry)
+    if issue_number:
+        click.echo(f"Issue '#{issue_number}' of series '{series}' added to pull list successfully.")
+    else:
+        click.echo(f"Series '{series}' added to pull list successfully.")
+    
+    
 if __name__ == '__main__':
     cli()
