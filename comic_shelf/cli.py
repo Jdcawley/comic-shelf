@@ -171,10 +171,38 @@ def add_to_pull_list(series, issue_number):
         return
     pull_list_entry = PullList(series=series_record, issue_number=issue_number)
     session.add(pull_list_entry)
+    session.commit()
     if issue_number:
         click.echo(f"Issue '#{issue_number}' of series '{series}' added to pull list successfully.")
     else:
         click.echo(f"Series '{series}' added to pull list successfully.")
+
+@cli.command()
+@click.option('--series', prompt='Series name', help='The name of the series to add to the wishlist.')
+@click.option('--issue-number', type=int, default=None, help='The issue number to add to the wishlist (optional).')
+@click.option('--notes', default=None, help='Additional notes for the wishlist entry.')
+def add_to_wishlist(series, issue_number, notes):
+    """Add a series to the wishlist."""
+    session = get_session()
+    series_record = session.query(Series).filter_by(name=series).first()
+    if not series_record:
+        click.echo(f"Series '{series}' not found.")
+        return
+    # Check first before adding to avoid unnecessary database entries
+    existing_entry = session.query(Wishlist).filter_by(series_id=series_record.id, issue_number=issue_number, active=True).first()
+    if existing_entry:
+        if issue_number:
+            click.echo(f"Issue '#{issue_number}' of series '{series}' is already in the wishlist.")
+        else:
+            click.echo(f"'{series}' is already in the wishlist.")
+        return
+    wishlist_entry = Wishlist(series=series_record, issue_number=issue_number, notes=notes)
+    session.add(wishlist_entry)
+    session.commit()
+    if issue_number:
+        click.echo(f"Issue '#{issue_number}' of series '{series}' added to wishlist successfully.")
+    else:
+        click.echo(f"Series '{series}' added to wishlist successfully.")
     
     
 if __name__ == '__main__':
