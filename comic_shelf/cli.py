@@ -1,3 +1,5 @@
+from turtle import title
+
 import click
 from comic_shelf.database import get_session, init_db
 from comic_shelf.models import Publisher, Series, Issue, Collection, PullList, Wishlist
@@ -134,6 +136,8 @@ def list_collection():
     if not collection_entries:
         click.echo("No issues in the collection.")
         return
+    current_publisher = None  # ← initialize before loop
+    current_series = None     # ← initialize before loop
     click.echo("Collection:")
     click.echo("-----------")
     for entry in collection_entries:
@@ -142,7 +146,7 @@ def list_collection():
         publisher = series.publisher
         if publisher.name != current_publisher:
             current_publisher = publisher.name
-            click.echo(f"\n{publisher.name}")
+            click.echo(f"{publisher.name}")
         if series.name != current_series:
             current_series = series.name
             click.echo(f"  {series.name}")
@@ -203,7 +207,37 @@ def add_to_wishlist(series, issue_number, notes):
         click.echo(f"Issue '#{issue_number}' of series '{series}' added to wishlist successfully.")
     else:
         click.echo(f"Series '{series}' added to wishlist successfully.")
+
+@cli.command()
+def list_pull_list():
+    """List all entries in the pull list."""
+    session = get_session()
+    pull_list_entries = session.query(PullList).filter_by(active=True).all()
+    if not pull_list_entries:
+        click.echo("No entries in the pull list.")
+        return
+    click.echo("Pull List:")
+    click.echo("----------")
+    for entry in pull_list_entries:
+        series = entry.series
+        title = f" #{entry.issue_number}" if entry.issue_number else " (full series)"
+        click.echo(f"{series.name}{title}")
     
+@cli.command()
+def list_wishlist(): 
+    """List all entries in the wishlist."""
+    session = get_session()
+    wishlist_entries = session.query(Wishlist).filter_by(active=True).all()
+    if not wishlist_entries:
+        click.echo("No entries in the wishlist.")
+        return
+    click.echo("Wishlist:")
+    click.echo("---------")
+    for entry in wishlist_entries:
+        series = entry.series
+        title = f" #{entry.issue_number}" if entry.issue_number else " (full series)"
+        notes = f" | Notes: {entry.notes}" if entry.notes else ""
+        click.echo(f"{series.name}{title}{notes}")
     
 if __name__ == '__main__':
     cli()
