@@ -132,3 +132,50 @@ def test_add_duplicate_wishlist_entry():
     result = runner.invoke(cli, ['add-to-wishlist', '--series', 'Test Series', '--issue-number', '1', '--notes', 'Must read!'])
     assert result.exit_code == 0
     assert "Issue '#1' of series 'Test Series' is already in the wishlist." in result.output
+
+# --- List Tests ---
+
+def test_list_publishers():
+    """Test that the list of publishers displays correctly."""
+    runner = CliRunner()
+    runner.invoke(cli, ['add-publisher', '--name', 'Publisher One'])
+    runner.invoke(cli, ['add-publisher', '--name', 'Publisher Two'])
+    result = runner.invoke(cli, ['list-publishers'])
+    assert result.exit_code == 0
+    assert "Publishers:" in result.output
+    assert "-----------" in result.output
+    assert "Publisher One" in result.output
+    assert "Publisher Two" in result.output
+
+def test_list_series():
+    """Test that the list of series displays correctly under their respective publishers."""
+    runner = CliRunner()
+    runner.invoke(cli, ['add-publisher', '--name', 'Publisher One'])
+    runner.invoke(cli, ['add-publisher', '--name', 'Publisher Two'])
+    runner.invoke(cli, ['add-series', '--name', 'Series A', '--publisher', 'Publisher One'])
+    runner.invoke(cli, ['add-series', '--name', 'Series B', '--publisher', 'Publisher One'])
+    runner.invoke(cli, ['add-series', '--name', 'Series C', '--publisher', 'Publisher Two'])
+    result = runner.invoke(cli, ['list-series'])
+    assert result.exit_code == 0
+    assert "Series:" in result.output
+    assert "-------" in result.output
+    assert "Series A, Publisher: Publisher One" in result.output
+    assert "Series B, Publisher: Publisher One" in result.output
+    assert "Series C, Publisher: Publisher Two" in result.output
+
+def test_list_collection():
+    """Test that the collection displays issues grouped by publisher and series."""
+    runner = CliRunner()
+    runner.invoke(cli, ['add-publisher', '--name', 'Publisher One'])
+    runner.invoke(cli, ['add-series', '--name', 'Series A', '--publisher', 'Publisher One'])
+    runner.invoke(cli, ['add-issue', '--series', 'Series A', '--issue-number', '1', '--title', 'Issue 1'])
+    runner.invoke(cli, ['add-issue', '--series', 'Series A', '--issue-number', '2', '--title', 'Issue 2'])
+    runner.invoke(cli, ['add-to-collection', '--series', 'Series A', '--issue-number', '1'])
+    result = runner.invoke(cli, ['list-collection'])
+    assert result.exit_code == 0
+    assert "Collection:" in result.output
+    assert "-----------" in result.output
+    assert "Publisher One" in result.output
+    assert "  Series A" in result.output
+    assert "    #1 - Issue 1 | Read: No | Condition: N/A" in result.output
+    assert "    #2 - Issue 2 | Read: No | Condition: N/A" not in result.output  # Only issue 1 was added to collection
