@@ -100,17 +100,6 @@ def test_add_to_pull_list_nonexistent_series():
     assert result.exit_code == 0
     assert "Series 'Nonexistent Series' not found." in result.output
 
-def test_list_pull_list():
-    """Test that the pull list displays added entries correctly."""
-    runner = CliRunner()
-    runner.invoke(cli, ['add-publisher', '--name', 'Test Publisher'])
-    runner.invoke(cli, ['add-series', '--name', 'Test Series', '--publisher', 'Test Publisher'])
-    runner.invoke(cli, ['add-to-pull-list', '--series', 'Test Series', '--issue-number', '1'])
-    result = runner.invoke(cli, ['list-pull-list'])
-    assert result.exit_code == 0
-    assert "Pull List:" in result.output
-    assert "Test Series #1" in result.output
-
 # --- Wishlist Tests ---
 
 def test_add_to_wishlist():
@@ -179,3 +168,25 @@ def test_list_collection():
     assert "  Series A" in result.output
     assert "    #1 - Issue 1 | Read: No | Condition: N/A" in result.output
     assert "    #2 - Issue 2 | Read: No | Condition: N/A" not in result.output  # Only issue 1 was added to collection
+
+def test_list_pull_list():
+    """Test that the pull list displays added entries correctly."""
+    runner = CliRunner()
+    runner.invoke(cli, ['add-publisher', '--name', 'Test Publisher'])
+    runner.invoke(cli, ['add-series', '--name', 'Test Series', '--publisher', 'Test Publisher'])
+    runner.invoke(cli, ['add-to-pull-list', '--series', 'Test Series', '--issue-number', '1'])
+    result = runner.invoke(cli, ['list-pull-list'])
+    assert result.exit_code == 0
+    assert "Pull List:" in result.output
+    assert "Test Series #1" in result.output
+
+def test_list_wishlist():
+    """Test that the wishlist displays added entries correctly, including notes."""
+    runner = CliRunner()
+    runner.invoke(cli, ['add-publisher', '--name', 'Test Publisher'])
+    runner.invoke(cli, ['add-series', '--name', 'Test Series', '--publisher', 'Test Publisher'])
+    runner.invoke(cli, ['add-to-wishlist', '--series', 'Test Series', '--issue-number', '1', '--notes', 'Must read!'])
+    result = runner.invoke(cli, ['list-wishlist'])
+    assert result.exit_code == 0
+    assert "Wishlist:" in result.output
+    assert "Test Series #1 | Notes: Must read!" in result.output
