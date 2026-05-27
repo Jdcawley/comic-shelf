@@ -31,6 +31,8 @@ class Series(Base):
     pull_list = relationship('PullList', back_populates='series', cascade='all, delete-orphan')
     wish_list = relationship('Wishlist', back_populates='series', cascade='all, delete-orphan')
 
+    comicvine_series = relationship('ComicVineSeries', back_populates='series', cascade='all, delete-orphan')
+
     def __repr__(self):
         return f"<Series(id={self.id}, name='{self.name}')>"
     
@@ -90,3 +92,19 @@ class Wishlist(Base):
 
     def __repr__(self):
         return f"<Wishlist(id={self.id}, series='{self.series.name}', issue_number={self.issue_number})>"
+    
+class ComicVineSeries(Base):
+    __tablename__ = 'comicvine_series'
+
+    id = Column(Integer, primary_key=True)
+    series_id = Column(Integer, ForeignKey('series.id'))
+    comicvine_id = Column(Integer, unique=True)  # Unique ID from Comic Vine API
+    start_year = Column(String)
+    image_url = Column(String)
+    deck = Column(String)
+    count_of_issues = Column(Integer)
+
+    series = relationship('Series', back_populates='comicvine_series')
+
+    def __repr__(self):
+        return f"<ComicVineSeries(id={self.id}, series_id={self.series_id}, comicvine_id={self.comicvine_id})>"
