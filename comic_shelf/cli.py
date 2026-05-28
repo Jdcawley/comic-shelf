@@ -1,9 +1,12 @@
 from turtle import title
 
+from requests import session
+
 import click
 from comic_shelf.database import get_session, init_db
-from comic_shelf.models import Publisher, Series, Issue, Collection, PullList, Wishlist
+from comic_shelf.models import Publisher, Series, Issue, Collection, PullList, Wishlist, ComicVineSeries
 from sqlalchemy.exc import IntegrityError
+from comic_shelf.api import search_series as cv_search_series, search_issue as cv_search_issue
 
 @click.group()
 def cli():
@@ -238,6 +241,104 @@ def list_wishlist():
         title = f" #{entry.issue_number}" if entry.issue_number else " (full series)"
         notes = f" | Notes: {entry.notes}" if entry.notes else ""
         click.echo(f"{series.name}{title}{notes}")
-    
+
+@cli.command()
+@click.option('--name', prompt='Series name', help='The name of the series to search for.')
+def search_series(name):
+    """Search for a series using the Comic Vine API."""
+    results = cv_search_series(name)
+    if not results or 'results' not in results or len(results['results']) == 0:
+        click.echo(f"No results found for '{name}'.")
+        return
+    click.echo(f"Search results for '{name}':")
+    click.echo("-----------------------------")
+    for i, result in enumerate(results['results'], start=1):
+        title = result.get('name', 'N/A')
+        publisher = result.get('publisher', {}).get('name', 'N/A')
+        start_year = result.get('start_year', 'N/A')
+        click.echo(f"{i}. {title} ({publisher}, Start Year: {start_year})")
+    user_choice = click.prompt("Enter the number to import (or 0 to cancel)", type=int)
+    if user_choice == 0:
+        click.echo("Import cancelled.")
+        return
+    if user_choice < 0 or user_choice > len(results['results']):
+        click.echo("Invalid choice.")
+        return
+    selected_series = results['results'][user_choice - 1]
+    click.echo(f"Selected: {selected_series.get('name')}")
+
+    if publisher_name := selected_series.get('publisher', {}).get('name'):
+        session = get_session()
+        publisher_record = session.query(Publisher).filter_by(name=publisher_name).first()
+        if not publisher_record:
+            publisher_record = Publisher(name=publisher_name)
+            session.add(publisher_record)
+            session.commit()
+
+        series_record = session.query(Series).filter_by(name=selected_series.get('name')).first()
+        if not series_record:
+            series_record = Series(
+                name=selected_series.get('name'),
+                publisher=publisher_record
+            )
+            session.add(series_record)
+            session.commit()
+        comicvine_record = session.query(ComicVineSeries).filter_by(comicvine_id=selected_series.get('id')).first()
+        if not comicvine_record:
+            comicvine_record = ComicVineSeries(
+                series=series_record,
+                comicvine_id=selected_series.get('id'),
+                start_year=selected_series.get('start_year'),
+                image_url=selected_series.get('image', {}).get('small_url'),
+                deck=selected_series.get('deck'),
+                count_of_issues=selected_series.get('count_of_issues')
+            )
+            session.add(comicvine_record)
+            session.commit()
+        click.echo(f"Successfully imported '{selected_series.get('name')}' ({publisher_name}).")
+    else:
+        click.echo("Publisher information is not available for this series. Cannot import.")
+        return
+
+@cli.command()
+@click.option('--series', prompt='Series name', help='The name of the series for the issue.')    
+@click.option('--issue-number', prompt='Issue number', type=int, help='The issue number to search for.')
+def search_issue(series, issue_number):
+    """Search for an issue using the Comic Vine API."""
+    session = get_session()
+    series_record = session.query(Series).filter_by(name=series).first()
+    if not series_record:
+        click.echo(f"Series '{series}' not found in the database.")
+        return
+    comicvine_metadata = session.query(ComicVineSeries).filter_by(series_id=series_record.id).first()
+    if not comicvine_metadata:
+        click.echo(f"No Comic Vine metadata found for series '{series}'. Please import the series first using 'search-series' command.")
+        return
+    comicvine_series_id = comicvine_metadata.comicvine_id
+    results = cv_search_issue(comicvine_series_id, issue_number)
+    if not results or 'results' not in results or len(results['results']) == 0:
+        click.echo(f"No results found for '{series} #{issue_number}'.")
+        return
+    issue = results['results'][0]  # Assuming the first result is the correct one
+    click.echo(f"Found issue: {issue.get('name')} (Issue #{issue.get('issue_number')}, Store Date: {issue.get('store_date')})")
+    confirm = click.confirm("Do you want to import this issue into the database?", default=True)
+    if not confirm:
+        click.echo("Import cancelled.")
+        return
+    click.echo("Importing issue into the database...")
+    issue_record = session.query(Issue).filter_by(series_id=series_record.id, issue_number=issue_number).first()
+    if issue_record:
+        click.echo(f"Issue #{issue_number} already exists in the database.")
+        return
+    new_issue = Issue(
+        series=series_record,
+        issue_number=issue.get('issue_number'),
+        title=issue.get('name'),
+        release_date=issue.get('store_date')
+    )
+    session.add(new_issue)
+    session.commit()
+    click.echo(f"Successfully imported '{series} #{issue_number}' into the database.")
+
 if __name__ == '__main__':
     cli()
